@@ -1,0 +1,46 @@
+diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
+index 3e80620d4643..370a0e302f01 100644
+--- a/drivers/media/platform/Kconfig
++++ b/drivers/media/platform/Kconfig
+@@ -225,6 +225,16 @@ config VIDEO_TI_CAL_MC
+ 
+ endif # VIDEO_TI_CAL
+ 
++config VIDEO_ECAM
++        tristate "e-con camera sensor support"
++        depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
++        help
++          This config is used to enable codes which are used to
++          support econ camera and to disable ISI control codes.
++
++          To compile this driver as a module, choose M here: the module
++          will be called based on sensor name.
++
+ endif # V4L_PLATFORM_DRIVERS
+ 
+ menuconfig V4L_MEM2MEM_DRIVERS
+diff --git a/drivers/media/platform/imx8/Kconfig b/drivers/media/platform/imx8/Kconfig
+index eb42572ef27f..0370a94ff028 100644
+--- a/drivers/media/platform/imx8/Kconfig
++++ b/drivers/media/platform/imx8/Kconfig
+@@ -5,6 +5,13 @@ config IMX8_MIPI_CSI2_YAV
+ 	tristate "IMX8 MIPI CSI2 Controller Yet Another Version"
+ 	default y
+ 
++config MXC_CAMERA_AR0521
++        tristate "AR0521 Camera driver support"
++        depends on I2C && VIDEO_ECAM
++        default y
++        help
++          Enable support for video4linux camera sensor driver for eCAM50_CUIMX8
++
+ endmenu
+ endif #VIDEO_MX8_CAPTURE
+ 
+diff --git a/drivers/media/platform/imx8/Makefile b/drivers/media/platform/imx8/Makefile
+index cc57cc26d5b4..65dd92988e9e 100644
+--- a/drivers/media/platform/imx8/Makefile
++++ b/drivers/media/platform/imx8/Makefile
+@@ -1 +1,2 @@
+ obj-$(CONFIG_IMX8_MIPI_CSI2_YAV) += mxc-mipi-csi2_yav.o
++obj-$(CONFIG_MXC_CAMERA_AR0521)   += ar0521.o

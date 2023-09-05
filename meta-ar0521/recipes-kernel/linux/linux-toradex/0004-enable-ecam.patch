@@ -1,0 +1,13 @@
+diff --git a/arch/arm64/configs/toradex_defconfig b/arch/arm64/configs/toradex_defconfig
+index 10395b5a3435..f80e0fddd222 100644
+--- a/arch/arm64/configs/toradex_defconfig
++++ b/arch/arm64/configs/toradex_defconfig
+@@ -561,6 +561,7 @@ CONFIG_VIDEO_MXC_CAPTURE=y
+ CONFIG_VIDEO_MX8_CAPTURE=y
+ CONFIG_VIDEO_MXC_CSI_CAMERA=y
+ CONFIG_MXC_MIPI_CSI=y
++CONFIG_VIDEO_ECAM=y
+ CONFIG_MXC_CAMERA_OV5640_MIPI_V2=y
+ CONFIG_V4L_MEM2MEM_DRIVERS=y
+ CONFIG_VIDEO_IMX219=m
+ 
