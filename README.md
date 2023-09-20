@@ -5,17 +5,20 @@ Please see the corresponding sections below for details.
 Dependencies
 ============
 
-  URI: git://git.toradex.com/meta-toradex-nxp
-  branch: kirkstone-6.x.y
-  revision: HEAD
+- meta-toradex-nxp
+  - URI: git://git.toradex.com/meta-toradex-nxp
+  - branch: kirkstone-6.x.y
+  - revision: HEAD
 
-  URI: git://git.toradex.com/meta-toradex-bsp-common
-  branch: kirkstone-6.x.y
-  revision: HEAD
+- meta-toradex-bsp-common
+  - URI: git://git.toradex.com/meta-toradex-bsp-common
+  - branch: kirkstone-6.x.y
+  - revision: HEAD
 
-  URI: git://git.toradex.com/meta-toradex-distro
-  branch: kirkstone-6.x.y
-  revision: HEAD
+- meta-toradex-distro
+  - URI: git://git.toradex.com/meta-toradex-distro
+  - branch: kirkstone-6.x.y
+  - revision: HEAD
 
 
 Patches
@@ -31,6 +34,7 @@ Table of Contents
 =================
 
   I. Adding the meta-toradex-econ layer to your build
+  
  II. Available Layers
 
 
