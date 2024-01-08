@@ -1,5 +1,5 @@
 diff --git a/drivers/media/platform/mxc/capture/mx6s_capture.c b/drivers/media/platform/mxc/capture/mx6s_capture.c
-index 39bef1e160b9..653b0323a2e1 100644
+index 84f0e40e49e0..c3b955af6d60 100644
 --- a/drivers/media/platform/mxc/capture/mx6s_capture.c
 +++ b/drivers/media/platform/mxc/capture/mx6s_capture.c
 @@ -50,7 +50,7 @@
@@ -379,10 +379,10 @@ index 636564a8a66b..24129beb0af3 100644
  			"lanes: %d, hs_settle: %d, clk_settle: %d, wclk: %d, freq: %u\n",
  		 state->num_lanes, state->hs_settle, state->clk_settle,
 diff --git a/drivers/staging/media/imx/imx8-isi-cap.c b/drivers/staging/media/imx/imx8-isi-cap.c
-index 6f83ba47f919..4ec81150f203 100644
+index b6e5a9cfab6c..3558cbdd36c4 100644
 --- a/drivers/staging/media/imx/imx8-isi-cap.c
 +++ b/drivers/staging/media/imx/imx8-isi-cap.c
-@@ -495,6 +495,8 @@ static struct vb2_ops mxc_cap_vb2_qops = {
+@@ -498,6 +498,8 @@ static struct vb2_ops mxc_cap_vb2_qops = {
  	.stop_streaming		= cap_vb2_stop_streaming,
  };
  
@@ -391,7 +391,7 @@ index 6f83ba47f919..4ec81150f203 100644
  /*
   * V4L2 controls handling
   */
-@@ -584,6 +586,7 @@ void mxc_isi_ctrls_delete(struct mxc_isi_cap_dev *isi_cap)
+@@ -610,6 +612,7 @@ void mxc_isi_ctrls_delete(struct mxc_isi_cap_dev *isi_cap)
  		ctrls->alpha = NULL;
  	}
  }
@@ -399,7 +399,7 @@ index 6f83ba47f919..4ec81150f203 100644
  
  static struct media_pad
  *mxc_isi_get_remote_source_pad(struct v4l2_subdev *subdev)
-@@ -1370,6 +1373,129 @@ static int mxc_isi_cap_enum_frameintervals(struct file *file, void *fh,
+@@ -1396,6 +1399,129 @@ static int mxc_isi_cap_enum_frameintervals(struct file *file, void *fh,
  	return 0;
  }
  
@@ -529,7 +529,7 @@ index 6f83ba47f919..4ec81150f203 100644
  static const struct v4l2_ioctl_ops mxc_isi_capture_ioctl_ops = {
  	.vidioc_querycap		= mxc_isi_cap_querycap,
  
-@@ -1397,6 +1523,16 @@ static const struct v4l2_ioctl_ops mxc_isi_capture_ioctl_ops = {
+@@ -1423,6 +1549,16 @@ static const struct v4l2_ioctl_ops mxc_isi_capture_ioctl_ops = {
  
  	.vidioc_enum_framesizes = mxc_isi_cap_enum_framesizes,
  	.vidioc_enum_frameintervals = mxc_isi_cap_enum_frameintervals,
@@ -546,7 +546,7 @@ index 6f83ba47f919..4ec81150f203 100644
  
  	.vidioc_subscribe_event   =  v4l2_ctrl_subscribe_event,
  	.vidioc_unsubscribe_event =  v4l2_event_unsubscribe,
-@@ -1713,22 +1849,29 @@ static int mxc_isi_register_cap_device(struct mxc_isi_cap_dev *isi_cap,
+@@ -1739,22 +1875,29 @@ static int mxc_isi_register_cap_device(struct mxc_isi_cap_dev *isi_cap,
  	if (ret)
  		goto err_free_ctx;
  
@@ -576,7 +576,7 @@ index 6f83ba47f919..4ec81150f203 100644
  err_me_cleanup:
  	media_entity_cleanup(&vdev->entity);
  err_free_ctx:
-@@ -1766,7 +1909,10 @@ static void mxc_isi_subdev_unregistered(struct v4l2_subdev *sd)
+@@ -1792,7 +1935,10 @@ static void mxc_isi_subdev_unregistered(struct v4l2_subdev *sd)
  	vdev = &isi_cap->vdev;
  	if (video_is_registered(vdev)) {
  		video_unregister_device(vdev);
@@ -783,7 +783,7 @@ index 1d12365520a6..8701978ad4f2 100644
  	.s_frame_interval = mipi_csis_s_frame_interval,
  };
 diff --git a/drivers/staging/media/imx/imx8-mipi-csi2.c b/drivers/staging/media/imx/imx8-mipi-csi2.c
-index 3c628fb1becd..6bc71b44c413 100644
+index 3297845d64b4..7f3c14cc1990 100644
 --- a/drivers/staging/media/imx/imx8-mipi-csi2.c
 +++ b/drivers/staging/media/imx/imx8-mipi-csi2.c
 @@ -1031,6 +1031,93 @@ static const struct media_entity_operations mipi_csi2_sd_media_ops = {
@@ -880,10 +880,10 @@ index 3c628fb1becd..6bc71b44c413 100644
  static int mipi_csi2_s_power(struct v4l2_subdev *sd, int on)
  {
  	struct mxc_mipi_csi2_dev *csi2dev = sd_to_mxc_mipi_csi2_dev(sd);
-@@ -1182,6 +1269,15 @@ static struct v4l2_subdev_pad_ops mipi_csi2_pad_ops = {
- 
+@@ -1203,6 +1290,15 @@ static struct v4l2_subdev_pad_ops mipi_csi2_pad_ops = {
  static struct v4l2_subdev_core_ops mipi_csi2_core_ops = {
  	.s_power = mipi_csi2_s_power,
+ 	.ioctl = mipi_csi2_s_ioctl,
 +#ifdef CONFIG_VIDEO_ECAM
 +	.queryctrl = mipi_csi2_queryctrl,
 +	.g_ctrl = mipi_csi2_g_ctrl,
@@ -897,7 +897,7 @@ index 3c628fb1becd..6bc71b44c413 100644
  
  static struct v4l2_subdev_video_ops mipi_csi2_video_ops = {
 diff --git a/include/media/v4l2-subdev.h b/include/media/v4l2-subdev.h
-index f3b840a2c1f1..5ab1a03a44d5 100644
+index f0cc537ea9ef..cda5cd5ff961 100644
 --- a/include/media/v4l2-subdev.h
 +++ b/include/media/v4l2-subdev.h
 @@ -198,6 +198,15 @@ struct v4l2_subdev_core_ops {
@@ -916,4 +916,3 @@ index f3b840a2c1f1..5ab1a03a44d5 100644
  	long (*command)(struct v4l2_subdev *sd, unsigned int cmd, void *arg);
  	long (*ioctl)(struct v4l2_subdev *sd, unsigned int cmd, void *arg);
  #ifdef CONFIG_COMPAT
- 
