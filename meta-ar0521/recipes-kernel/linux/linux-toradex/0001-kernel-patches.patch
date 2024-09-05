@@ -1,5 +1,5 @@
 diff --git a/drivers/media/platform/mxc/capture/mx6s_capture.c b/drivers/media/platform/mxc/capture/mx6s_capture.c
-index 84f0e40e49e0..c3b955af6d60 100644
+index 84f0e40e49e0..994898edde5c 100644
 --- a/drivers/media/platform/mxc/capture/mx6s_capture.c
 +++ b/drivers/media/platform/mxc/capture/mx6s_capture.c
 @@ -50,7 +50,7 @@
@@ -40,7 +40,16 @@ index 84f0e40e49e0..c3b955af6d60 100644
  			cr18 |= BIT_MIPI_DATA_FORMAT_YUV422_8B;
  			break;
  		case V4L2_PIX_FMT_SBGGR8:
-@@ -1269,12 +1283,17 @@ static struct v4l2_file_operations mx6s_csi_fops = {
+@@ -1132,7 +1146,7 @@ static irqreturn_t mx6s_csi_irq_handler(int irq, void *data)
+ 		csi_write(csi_dev, cr18, CSI_CSICR18);
+ 
+ 		csi_dev->skipframe++;
+-		pr_debug("base address switching Change Err.\n");
++		pr_info("base address switching Change Err.\n");
+ 	}
+ 
+ 	if ((status & BIT_DMA_TSF_DONE_FB1) &&
+@@ -1269,6 +1283,9 @@ static struct v4l2_file_operations mx6s_csi_fops = {
  static int mx6s_vidioc_enum_input(struct file *file, void *priv,
  				 struct v4l2_input *inp)
  {
@@ -50,15 +59,18 @@ index 84f0e40e49e0..c3b955af6d60 100644
  	if (inp->index != 0)
  		return -EINVAL;
  
- 	/* default is camera */
+@@ -1276,6 +1293,10 @@ static int mx6s_vidioc_enum_input(struct file *file, void *priv,
  	inp->type = V4L2_INPUT_TYPE_CAMERA;
  	strcpy(inp->name, "Camera");
-+	if (!v4l2_subdev_has_op(sd, video, s_std))
-+		inp->capabilities &= ~V4L2_IN_CAP_STD;
  
++	if (csi_dev->cam_csi_bridge){
++		if (!v4l2_subdev_has_op(sd, video, s_std))
++			inp->capabilities &= ~V4L2_IN_CAP_STD;
++	}
  	return 0;
  }
-@@ -1476,9 +1495,36 @@ static int mx6s_vidioc_g_fmt_vid_cap(struct file *file, void *priv,
+ 
+@@ -1476,9 +1497,38 @@ static int mx6s_vidioc_g_fmt_vid_cap(struct file *file, void *priv,
  				    struct v4l2_format *f)
  {
  	struct mx6s_csi_dev *csi_dev = video_drvdata(file);
@@ -70,50 +82,56 @@ index 84f0e40e49e0..c3b955af6d60 100644
  
  	WARN_ON(priv != file->private_data);
  
++	if (csi_dev->cam_csi_bridge){
 +	/*
 +	 * Get the format information from the subdev
 +	 */
-+	ret = v4l2_subdev_call(sd, pad, get_fmt, NULL, &format);
-+	if (ret) {
-+		pr_info("Error in getting format. ret = %d\n", ret);
-+		return ret;
-+	}
-+	else {
-+		struct v4l2_pix_format *pix = &csi_dev->pix;
-+		struct mx6s_fmt *fmt;
++		ret = v4l2_subdev_call(sd, pad, get_fmt, NULL, &format);
++		if (ret) {
++			pr_info("Error in getting format. ret = %d\n", ret);
++			return ret;
++		}
++		else {
++			struct v4l2_pix_format *pix = &csi_dev->pix;
++			struct mx6s_fmt *fmt;
 +
-+		v4l2_fill_pix_format(pix, &format.format);
-+		if (pix->field != V4L2_FIELD_INTERLACED)
-+			pix->field = V4L2_FIELD_NONE;
++			v4l2_fill_pix_format(pix, &format.format);
++			if (pix->field != V4L2_FIELD_INTERLACED)
++				pix->field = V4L2_FIELD_NONE;
 +
-+		fmt = format_by_mbus(format.format.code);
-+		pix->pixelformat = fmt->pixelformat;
-+		pix->sizeimage = fmt->bpp * pix->height * pix->width;
-+		pix->bytesperline = fmt->bpp * pix->width;
++			fmt = format_by_mbus(format.format.code);
++			pix->pixelformat = fmt->pixelformat;
++			pix->sizeimage = fmt->bpp * pix->height * pix->width;
++			pix->bytesperline = fmt->bpp * pix->width;
++		}
 +	}
 +
  	f->fmt.pix = csi_dev->pix;
  
  	return 0;
-@@ -1623,6 +1669,8 @@ static int mx6s_vidioc_enum_framesizes(struct file *file, void *priv,
+@@ -1623,6 +1673,10 @@ static int mx6s_vidioc_enum_framesizes(struct file *file, void *priv,
  	int ret;
  
  	fmt = format_by_fourcc(fsize->pixel_format);
++
 +	if(fmt == NULL)
 +		return -EINVAL;
++	
  	if (fmt->pixelformat != fsize->pixel_format)
  		return -EINVAL;
  	fse.code = fmt->mbus_code;
-@@ -1665,6 +1713,8 @@ static int mx6s_vidioc_enum_frameintervals(struct file *file, void *priv,
+@@ -1665,6 +1719,10 @@ static int mx6s_vidioc_enum_frameintervals(struct file *file, void *priv,
  	int ret;
  
  	fmt = format_by_fourcc(interval->pixel_format);
++
 +	if(fmt == NULL)
 +		return -EINVAL;
++	
  	if (fmt->pixelformat != interval->pixel_format)
  		return -EINVAL;
  	fie.code = fmt->mbus_code;
-@@ -1677,6 +1727,102 @@ static int mx6s_vidioc_enum_frameintervals(struct file *file, void *priv,
+@@ -1677,6 +1735,99 @@ static int mx6s_vidioc_enum_frameintervals(struct file *file, void *priv,
  	return 0;
  }
  
@@ -123,7 +141,6 @@ index 84f0e40e49e0..c3b955af6d60 100644
 +{
 +        struct mx6s_csi_dev *csi_dev = video_drvdata(file);
 +        struct v4l2_subdev *sd = csi_dev->sd;
-+
 +        return v4l2_subdev_call(sd, core, queryctrl, a);
 +}
 +
@@ -183,7 +200,6 @@ index 84f0e40e49e0..c3b955af6d60 100644
 +
 +        return v4l2_subdev_call(sd, core, s_ctrl, a);
 +}
-+
 +static int mx6s_vidioc_g_ext_ctrls(struct file *file, void *priv,
 +                             struct v4l2_ext_controls *a)
 +{
@@ -210,13 +226,12 @@ index 84f0e40e49e0..c3b955af6d60 100644
 +
 +        return v4l2_subdev_call(sd, core, try_ext_ctrls, a);
 +}
-+
 +#endif
 +
  static const struct v4l2_ioctl_ops mx6s_csi_ioctl_ops = {
  	.vidioc_querycap          = mx6s_vidioc_querycap,
  	.vidioc_enum_fmt_vid_cap  = mx6s_vidioc_enum_fmt_vid_cap,
-@@ -1703,6 +1849,16 @@ static const struct v4l2_ioctl_ops mx6s_csi_ioctl_ops = {
+@@ -1703,6 +1854,16 @@ static const struct v4l2_ioctl_ops mx6s_csi_ioctl_ops = {
  	.vidioc_s_parm        = mx6s_vidioc_s_parm,
  	.vidioc_enum_framesizes = mx6s_vidioc_enum_framesizes,
  	.vidioc_enum_frameintervals = mx6s_vidioc_enum_frameintervals,
@@ -224,7 +239,7 @@ index 84f0e40e49e0..c3b955af6d60 100644
 +        .vidioc_queryctrl       = mx6s_vidioc_queryctrl,
 +        .vidioc_query_ext_ctrl  = mx6s_vidioc_query_ext_ctrl,
 +        .vidioc_querymenu       = mx6s_vidioc_querymenu,
-+        .vidioc_g_ctrl          = mx6s_vidioc_g_ctrl,
++       .vidioc_g_ctrl          = mx6s_vidioc_g_ctrl,
 +        .vidioc_s_ctrl          = mx6s_vidioc_s_ctrl,
 +        .vidioc_g_ext_ctrls     = mx6s_vidioc_g_ext_ctrls,
 +        .vidioc_s_ext_ctrls     = mx6s_vidioc_s_ext_ctrls,
@@ -233,7 +248,7 @@ index 84f0e40e49e0..c3b955af6d60 100644
  };
  
  static int subdev_notifier_bound(struct v4l2_async_notifier *notifier,
-@@ -1891,6 +2047,12 @@ static int mx6s_csi_probe(struct platform_device *pdev)
+@@ -1891,6 +2052,12 @@ static int mx6s_csi_probe(struct platform_device *pdev)
  	mx6s_csi_mode_sel(csi_dev);
  	mx6s_csi_two_8bit_sensor_mode_sel(csi_dev);
  
@@ -247,7 +262,7 @@ index 84f0e40e49e0..c3b955af6d60 100644
  	if (!of_id)
  		return -EINVAL;
 diff --git a/drivers/media/platform/mxc/capture/mxc_mipi_csi.c b/drivers/media/platform/mxc/capture/mxc_mipi_csi.c
-index 636564a8a66b..24129beb0af3 100644
+index 636564a8a66b..9f793b677718 100644
 --- a/drivers/media/platform/mxc/capture/mxc_mipi_csi.c
 +++ b/drivers/media/platform/mxc/capture/mxc_mipi_csi.c
 @@ -271,6 +271,7 @@ struct csi_state {
@@ -265,20 +280,39 @@ index 636564a8a66b..24129beb0af3 100644
 +	}, {
 +                .code = MEDIA_BUS_FMT_UYVY8_2X8,
 +                .fmt_reg = MIPI_CSIS_ISPCFG_FMT_YCBCR422_8BIT,
-+              	.data_alignment = 16,
++                .data_alignment = 16,
  	}, {
  		.code = MEDIA_BUS_FMT_SBGGR8_1X8,
  		.fmt_reg = MIPI_CSIS_ISPCFG_FMT_RAW8,
-@@ -472,6 +477,8 @@ static void __mipi_csis_set_format(struct csi_state *state)
- 	/* Color format */
- 	val = mipi_csis_read(state, MIPI_CSIS_ISPCONFIG_CH0);
- 	val = (val & ~MIPI_CSIS_ISPCFG_FMT_MASK) | state->csis_fmt->fmt_reg;
+@@ -508,6 +513,8 @@ static void mipi_csis_set_params(struct csi_state *state)
+ 		val |= MIPI_CSIS_ISPCFG_ALIGN_32BIT;
+ 	else /* Normal output */
+ 		val &= ~MIPI_CSIS_ISPCFG_ALIGN_32BIT;
 +	if (state->cam_format_change)
-+		val |= MIPI_CSIS_ISPCFG_DOUBLE_CMPNT;
++		val |= 1 << 12; /*Dual Pixel Mode */
  	mipi_csis_write(state, MIPI_CSIS_ISPCONFIG_CH0, val);
  
- 	/* Pixel resolution */
-@@ -840,6 +847,65 @@ static int mipi_csis_enum_frameintervals(struct v4l2_subdev *mipi_sd,
+ 	val = (0 << MIPI_CSIS_ISPSYNC_HSYNC_LINTV_OFFSET) |
+@@ -667,13 +674,16 @@ static int mipi_csis_s_power(struct v4l2_subdev *mipi_sd, int on)
+ {
+ 	struct csi_state *state = mipi_sd_to_csi_state(mipi_sd);
+ 	struct device *dev = &state->pdev->dev;
++	int ret = 0;
+ 
+-	v4l2_subdev_call(state->sensor_sd, core, s_power, on);
+-
++	ret = v4l2_subdev_call(state->sensor_sd, core, s_power, on);
++#if 0
+ 	if (on)
+ 		return pm_runtime_get_sync(dev);
+ 
+ 	return pm_runtime_put_sync(dev);
++#endif
++	return ret;
+ }
+ 
+ static int mipi_csis_s_stream(struct v4l2_subdev *mipi_sd, int enable)
+@@ -840,6 +850,65 @@ static int mipi_csis_enum_frameintervals(struct v4l2_subdev *mipi_sd,
  	return v4l2_subdev_call(sensor_sd, pad, enum_frame_interval, NULL, fie);
  }
  
@@ -295,7 +329,7 @@ index 636564a8a66b..24129beb0af3 100644
 +static int mipi_csis_g_ctrl(struct v4l2_subdev *mipi_sd, struct v4l2_control *ctrl)
 +{
 +        struct csi_state *state = mipi_sd_to_csi_state(mipi_sd);
-+        struct v4l2_subdev *sensor_sd = state->sensor_sd;
++       struct v4l2_subdev *sensor_sd = state->sensor_sd;
 +
 +        return v4l2_subdev_call(sensor_sd, core, g_ctrl, ctrl);
 +}
@@ -327,7 +361,7 @@ index 636564a8a66b..24129beb0af3 100644
 +static int mipi_csis_try_ext_ctrls(struct v4l2_subdev *mipi_sd, struct v4l2_ext_controls *ctrls)
 +{
 +        struct csi_state *state = mipi_sd_to_csi_state(mipi_sd);
-+        struct v4l2_subdev *sensor_sd = state->sensor_sd;
++       struct v4l2_subdev *sensor_sd = state->sensor_sd;
 +
 +        return v4l2_subdev_call(sensor_sd, core, try_ext_ctrls, ctrls);
 +}
@@ -344,14 +378,14 @@ index 636564a8a66b..24129beb0af3 100644
  static int mipi_csis_log_status(struct v4l2_subdev *mipi_sd)
  {
  	struct csi_state *state = mipi_sd_to_csi_state(mipi_sd);
-@@ -855,6 +921,15 @@ static int mipi_csis_log_status(struct v4l2_subdev *mipi_sd)
+@@ -855,6 +924,15 @@ static int mipi_csis_log_status(struct v4l2_subdev *mipi_sd)
  static struct v4l2_subdev_core_ops mipi_csis_core_ops = {
  	.s_power = mipi_csis_s_power,
  	.log_status = mipi_csis_log_status,
 +#ifdef CONFIG_VIDEO_ECAM
 +	.queryctrl = mipi_csis_queryctrl,
 +        .g_ctrl = mipi_csis_g_ctrl,
-+        .s_ctrl = mipi_csis_s_ctrl,
++       .s_ctrl = mipi_csis_s_ctrl,
 +        .g_ext_ctrls = mipi_csis_g_ext_ctrls,
 +        .s_ext_ctrls = mipi_csis_s_ext_ctrls,
 +        .try_ext_ctrls = mipi_csis_try_ext_ctrls,
@@ -360,15 +394,15 @@ index 636564a8a66b..24129beb0af3 100644
  };
  
  static struct v4l2_subdev_video_ops mipi_csis_video_ops = {
-@@ -964,6 +1039,7 @@ static int mipi_csis_parse_dt(struct platform_device *pdev,
- 		return -EINVAL;
+@@ -965,6 +1043,7 @@ static int mipi_csis_parse_dt(struct platform_device *pdev,
  	}
  
-+	state->cam_format_change = of_property_read_bool(node, "cam-format-change");
  	/* Get MIPI CSI-2 bus configration from the endpoint node. */
++	state->cam_format_change = of_property_read_bool(node, "cam-format-change");
  	of_property_read_u32(node, "csis-hs-settle",
  					&state->hs_settle);
-@@ -1167,7 +1243,8 @@ static int mipi_csis_probe(struct platform_device *pdev)
+ 
+@@ -1167,7 +1246,8 @@ static int mipi_csis_probe(struct platform_device *pdev)
  			goto e_sd_host;
  	}
  
@@ -379,27 +413,49 @@ index 636564a8a66b..24129beb0af3 100644
  			"lanes: %d, hs_settle: %d, clk_settle: %d, wclk: %d, freq: %u\n",
  		 state->num_lanes, state->hs_settle, state->clk_settle,
 diff --git a/drivers/staging/media/imx/imx8-isi-cap.c b/drivers/staging/media/imx/imx8-isi-cap.c
-index b6e5a9cfab6c..3558cbdd36c4 100644
+index b6e5a9cfab6c..80e9b75a1187 100644
 --- a/drivers/staging/media/imx/imx8-isi-cap.c
 +++ b/drivers/staging/media/imx/imx8-isi-cap.c
-@@ -498,6 +498,8 @@ static struct vb2_ops mxc_cap_vb2_qops = {
+@@ -498,6 +498,10 @@ static struct vb2_ops mxc_cap_vb2_qops = {
  	.stop_streaming		= cap_vb2_stop_streaming,
  };
  
 +/* To enable ctrls in sensor driver, we need to comment the ISI ctrls */
++
 +#ifndef CONFIG_VIDEO_ECAM
++
  /*
   * V4L2 controls handling
   */
-@@ -610,6 +612,7 @@ void mxc_isi_ctrls_delete(struct mxc_isi_cap_dev *isi_cap)
- 		ctrls->alpha = NULL;
- 	}
+@@ -600,6 +604,8 @@ int mxc_isi_ctrls_create(struct mxc_isi_cap_dev *isi_cap)
+ 	return handler->error;
  }
-+#endif
  
- static struct media_pad
- *mxc_isi_get_remote_source_pad(struct v4l2_subdev *subdev)
-@@ -1396,6 +1399,129 @@ static int mxc_isi_cap_enum_frameintervals(struct file *file, void *fh,
++#endif
++
+ void mxc_isi_ctrls_delete(struct mxc_isi_cap_dev *isi_cap)
+ {
+ 	struct mxc_isi_ctrls *ctrls = &isi_cap->ctrls;
+@@ -730,6 +736,7 @@ static int mxc_isi_capture_open(struct file *file)
+ 	struct mxc_isi_cap_dev *isi_cap = video_drvdata(file);
+ 	struct mxc_isi_dev *mxc_isi = mxc_isi_get_hostdata(isi_cap->pdev);
+ 	struct device *dev = &isi_cap->pdev->dev;
++	struct v4l2_subdev *sd;
+ 	int ret = -EBUSY;
+ 
+ 	mutex_lock(&isi_cap->lock);
+@@ -745,6 +752,10 @@ static int mxc_isi_capture_open(struct file *file)
+ 		return ret;
+ 	}
+ 
++	sd = mxc_get_remote_subdev(&isi_cap->sd, __func__);
++        if (!sd)
++		return -ENODEV;
++
+ 	mutex_lock(&isi_cap->lock);
+ 	ret = v4l2_fh_open(file);
+ 	if (ret) {
+@@ -1396,6 +1407,125 @@ static int mxc_isi_cap_enum_frameintervals(struct file *file, void *fh,
  	return 0;
  }
  
@@ -409,7 +465,6 @@ index b6e5a9cfab6c..3558cbdd36c4 100644
 +{
 +	struct mxc_isi_cap_dev *isi_cap = video_drvdata(file);
 +	struct v4l2_subdev *sd;
-+
 +	sd = mxc_get_remote_subdev(&isi_cap->sd, __func__);
 +	if (!sd)
 +		return -EINVAL;
@@ -421,14 +476,13 @@ index b6e5a9cfab6c..3558cbdd36c4 100644
 +					struct v4l2_query_ext_ctrl *qec)
 +{
 +	struct v4l2_queryctrl qc = {
-+		.id = qec->id
++	.id = qec->id
 +	};
 +	int ret;
 +
 +	ret = mxc_vidioc_queryctrl(file, fh, &qc);
-+
 +	if (ret)
-+		return ret;
++	return ret;
 +
 +	qec->id = qc.id;
 +	qec->type = qc.type;
@@ -478,7 +532,6 @@ index b6e5a9cfab6c..3558cbdd36c4 100644
 +{
 +	struct mxc_isi_cap_dev *isi_cap = video_drvdata(file);
 +	struct v4l2_subdev *sd;
-+
 +	sd = mxc_get_remote_subdev(&isi_cap->sd, __func__);
 +	if (!sd)
 +		return -EINVAL;
@@ -494,7 +547,7 @@ index b6e5a9cfab6c..3558cbdd36c4 100644
 +
 +	sd = mxc_get_remote_subdev(&isi_cap->sd, __func__);
 +	if (!sd)
-+		return -EINVAL;
++	return -EINVAL;
 +
 +	return v4l2_subdev_call(sd, core, g_ext_ctrls, a);
 +}
@@ -513,7 +566,7 @@ index b6e5a9cfab6c..3558cbdd36c4 100644
 +}
 +
 +static int mxc_isi_vidioc_s_ext_ctrls(struct file *file, void *fh,
-+				  struct v4l2_ext_controls *a)
++			  struct v4l2_ext_controls *a)
 +{
 +	struct mxc_isi_cap_dev *isi_cap = video_drvdata(file);
 +	struct v4l2_subdev *sd;
@@ -521,7 +574,6 @@ index b6e5a9cfab6c..3558cbdd36c4 100644
 +	sd = mxc_get_remote_subdev(&isi_cap->sd, __func__);
 +	if (!sd)
 +		return -EINVAL;
-+
 +	return v4l2_subdev_call(sd, core, s_ext_ctrls, a);
 +}
 +#endif
@@ -529,10 +581,10 @@ index b6e5a9cfab6c..3558cbdd36c4 100644
  static const struct v4l2_ioctl_ops mxc_isi_capture_ioctl_ops = {
  	.vidioc_querycap		= mxc_isi_cap_querycap,
  
-@@ -1423,6 +1549,16 @@ static const struct v4l2_ioctl_ops mxc_isi_capture_ioctl_ops = {
- 
+@@ -1424,8 +1554,21 @@ static const struct v4l2_ioctl_ops mxc_isi_capture_ioctl_ops = {
  	.vidioc_enum_framesizes = mxc_isi_cap_enum_framesizes,
  	.vidioc_enum_frameintervals = mxc_isi_cap_enum_frameintervals,
+ 
 +#ifdef CONFIG_VIDEO_ECAM
 +	.vidioc_queryctrl	= mxc_vidioc_queryctrl,
 +	.vidioc_query_ext_ctrl	= mxc_vidioc_query_ext_ctrl,
@@ -541,17 +593,23 @@ index b6e5a9cfab6c..3558cbdd36c4 100644
 +	.vidioc_s_ctrl		= mxc_isi_vidioc_s_ctrl,
 +	.vidioc_g_ext_ctrls	= mxc_isi_vidioc_g_ext_ctrls,
 +	.vidioc_s_ext_ctrls	= mxc_isi_vidioc_s_ext_ctrls,
-+	.vidioc_try_ext_ctrls	= mxc_isi_vidioc_try_ext_ctrls,
++	.vidioc_try_ext_ctrls	= mxc_isi_vidioc_try_ext_ctrls
 +#endif
- 
++
++#ifndef CONFIG_VIDEO_ECAM
  	.vidioc_subscribe_event   =  v4l2_ctrl_subscribe_event,
  	.vidioc_unsubscribe_event =  v4l2_event_unsubscribe,
-@@ -1739,22 +1875,29 @@ static int mxc_isi_register_cap_device(struct mxc_isi_cap_dev *isi_cap,
++#endif
+ };
+ 
+ /* Capture subdev media entity operations */
+@@ -1739,23 +1882,31 @@ static int mxc_isi_register_cap_device(struct mxc_isi_cap_dev *isi_cap,
  	if (ret)
  		goto err_free_ctx;
  
 +/* To enable ctrls in sensor driver, we need to comment the ISI ctrls */
 +#ifndef CONFIG_VIDEO_ECAM
++
  	ret = mxc_isi_ctrls_create(isi_cap);
  	if (ret)
  		goto err_me_cleanup;
@@ -572,11 +630,12 @@ index b6e5a9cfab6c..3558cbdd36c4 100644
  err_ctrl_free:
 +#ifndef CONFIG_VIDEO_ECAM
  	mxc_isi_ctrls_delete(isi_cap);
-+#endif
  err_me_cleanup:
++#endif
  	media_entity_cleanup(&vdev->entity);
  err_free_ctx:
-@@ -1792,7 +1935,10 @@ static void mxc_isi_subdev_unregistered(struct v4l2_subdev *sd)
+ 	return ret;
+@@ -1792,7 +1943,10 @@ static void mxc_isi_subdev_unregistered(struct v4l2_subdev *sd)
  	vdev = &isi_cap->vdev;
  	if (video_is_registered(vdev)) {
  		video_unregister_device(vdev);
@@ -588,7 +647,7 @@ index b6e5a9cfab6c..3558cbdd36c4 100644
  	}
  	mutex_unlock(&isi_cap->lock);
 diff --git a/drivers/staging/media/imx/imx8-isi-fmt.c b/drivers/staging/media/imx/imx8-isi-fmt.c
-index db11c809a3d3..5fbd37d74bff 100644
+index db11c809a3d3..7874b163f99b 100644
 --- a/drivers/staging/media/imx/imx8-isi-fmt.c
 +++ b/drivers/staging/media/imx/imx8-isi-fmt.c
 @@ -8,6 +8,15 @@
@@ -599,14 +658,23 @@ index db11c809a3d3..5fbd37d74bff 100644
 +		.fourcc		= V4L2_PIX_FMT_UYVY,
 +		.depth		= { 16 },
 +		.color		= MXC_ISI_OUT_FMT_YUV422_1P8P,
-+		.memplanes	= 1,
++	.memplanes	= 1,
 +		.colplanes	= 1,
-+		.align		= 3,
-+		.mbus_code	= MEDIA_BUS_FMT_UYVY8_2X8,
++		.mbus_code  = MEDIA_BUS_FMT_UYVY8_2X8,
 +	}, {
++
  		.name		= "RGB565",
  		.fourcc		= V4L2_PIX_FMT_RGB565,
  		.depth		= { 16 },
+@@ -42,7 +51,7 @@ struct mxc_isi_fmt mxc_isi_out_formats[] = {
+ 		.memplanes	= 1,
+ 		.colplanes	= 1,
+ 		.align		= 3,
+-		.mbus_code	= MEDIA_BUS_FMT_YUYV8_1X16,
++		.mbus_code	= MEDIA_BUS_FMT_YUYV8_2X8,
+ 	}, {
+ 		.name		= "YUV32 (X-Y-U-V)",
+ 		.fourcc		= V4L2_PIX_FMT_YUV32,
 diff --git a/drivers/staging/media/imx/imx8-mipi-csi2-sam.c b/drivers/staging/media/imx/imx8-mipi-csi2-sam.c
 index 1d12365520a6..8701978ad4f2 100644
 --- a/drivers/staging/media/imx/imx8-mipi-csi2-sam.c
@@ -782,128 +850,15 @@ index 1d12365520a6..8701978ad4f2 100644
  	.g_frame_interval = mipi_csis_g_frame_interval,
  	.s_frame_interval = mipi_csis_s_frame_interval,
  };
-diff --git a/drivers/staging/media/imx/imx8-mipi-csi2.c b/drivers/staging/media/imx/imx8-mipi-csi2.c
-index 3297845d64b4..7f3c14cc1990 100644
---- a/drivers/staging/media/imx/imx8-mipi-csi2.c
-+++ b/drivers/staging/media/imx/imx8-mipi-csi2.c
-@@ -1031,6 +1031,93 @@ static const struct media_entity_operations mipi_csi2_sd_media_ops = {
- /*
-  * V4L2 subdev operations
-  */
-+#ifdef CONFIG_VIDEO_ECAM
-+static int mipi_csi2_querymenu(struct v4l2_subdev *sd, struct v4l2_querymenu *qm)
-+{
-+	struct mxc_mipi_csi2_dev *csi2dev = sd_to_mxc_mipi_csi2_dev(sd);
-+	struct v4l2_subdev *sen_sd;
-+
-+	sen_sd = mxc_get_remote_subdev(csi2dev, __func__);
-+	if (!sen_sd)
-+		return -EINVAL;
-+
-+	return v4l2_subdev_call(sen_sd, core, querymenu, qm);
-+}
-+
-+static int mipi_csi2_queryctrl(struct v4l2_subdev *sd, struct v4l2_queryctrl *qc)
-+{
-+	struct mxc_mipi_csi2_dev *csi2dev = sd_to_mxc_mipi_csi2_dev(sd);
-+	struct v4l2_subdev *sen_sd;
-+
-+	sen_sd = mxc_get_remote_subdev(csi2dev, __func__);
-+	if (!sen_sd)
-+		return -EINVAL;
-+
-+	return v4l2_subdev_call(sen_sd, core, queryctrl, qc);
-+}
-+
-+static int mipi_csi2_g_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
-+{
-+	struct mxc_mipi_csi2_dev *csi2dev = sd_to_mxc_mipi_csi2_dev(sd);
-+	struct v4l2_subdev *sen_sd;
-+
-+	sen_sd = mxc_get_remote_subdev(csi2dev, __func__);
-+	if (!sen_sd)
-+		return -EINVAL;
-+
-+	return v4l2_subdev_call(sen_sd, core, g_ctrl, ctrl);
-+}
-+
-+static int mipi_csi2_s_ctrl(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
-+{
-+
-+	struct mxc_mipi_csi2_dev *csi2dev = sd_to_mxc_mipi_csi2_dev(sd);
-+	struct v4l2_subdev *sen_sd;
-+
-+	sen_sd = mxc_get_remote_subdev(csi2dev, __func__);
-+	if (!sen_sd)
-+		return -EINVAL;
-+
-+	return v4l2_subdev_call(sen_sd, core, s_ctrl, ctrl);
-+}
-+
-+static int mipi_csi2_g_ext_ctrls(struct v4l2_subdev *sd, struct v4l2_ext_controls *ctrls)
-+{
-+	struct mxc_mipi_csi2_dev *csi2dev = sd_to_mxc_mipi_csi2_dev(sd);
-+	struct v4l2_subdev *sen_sd;
-+
-+	sen_sd = mxc_get_remote_subdev(csi2dev, __func__);
-+	if (!sen_sd)
-+		return -EINVAL;
-+
-+	return v4l2_subdev_call(sen_sd, core, g_ext_ctrls, ctrls);
-+}
-+
-+static int mipi_csi2_try_ext_ctrls(struct v4l2_subdev *sd, struct v4l2_ext_controls *ctrls)
-+{
-+	struct mxc_mipi_csi2_dev *csi2dev = sd_to_mxc_mipi_csi2_dev(sd);
-+	struct v4l2_subdev *sen_sd;
-+
-+	sen_sd = mxc_get_remote_subdev(csi2dev, __func__);
-+	if (!sen_sd)
-+		return -EINVAL;
-+
-+	return v4l2_subdev_call(sen_sd, core, try_ext_ctrls, ctrls);
-+}
-+
-+static int mipi_csi2_s_ext_ctrls(struct v4l2_subdev *sd, struct v4l2_ext_controls *ctrls)
-+{
-+	struct mxc_mipi_csi2_dev *csi2dev = sd_to_mxc_mipi_csi2_dev(sd);
-+	struct v4l2_subdev *sen_sd;
-+
-+	sen_sd = mxc_get_remote_subdev(csi2dev, __func__);
-+	if (!sen_sd)
-+		return -EINVAL;
-+
-+	return v4l2_subdev_call(sen_sd, core, s_ext_ctrls, ctrls);
-+}
-+#endif
-+
- static int mipi_csi2_s_power(struct v4l2_subdev *sd, int on)
- {
- 	struct mxc_mipi_csi2_dev *csi2dev = sd_to_mxc_mipi_csi2_dev(sd);
-@@ -1203,6 +1290,15 @@ static struct v4l2_subdev_pad_ops mipi_csi2_pad_ops = {
- static struct v4l2_subdev_core_ops mipi_csi2_core_ops = {
- 	.s_power = mipi_csi2_s_power,
- 	.ioctl = mipi_csi2_s_ioctl,
-+#ifdef CONFIG_VIDEO_ECAM
-+	.queryctrl = mipi_csi2_queryctrl,
-+	.g_ctrl = mipi_csi2_g_ctrl,
-+	.s_ctrl = mipi_csi2_s_ctrl,
-+	.g_ext_ctrls = mipi_csi2_g_ext_ctrls,
-+	.s_ext_ctrls = mipi_csi2_s_ext_ctrls,
-+	.try_ext_ctrls = mipi_csi2_try_ext_ctrls,
-+	.querymenu = mipi_csi2_querymenu,
-+#endif
- };
- 
- static struct v4l2_subdev_video_ops mipi_csi2_video_ops = {
 diff --git a/include/media/v4l2-subdev.h b/include/media/v4l2-subdev.h
-index f0cc537ea9ef..cda5cd5ff961 100644
+index f0cc537ea9ef..ce862d1c38e2 100644
 --- a/include/media/v4l2-subdev.h
 +++ b/include/media/v4l2-subdev.h
-@@ -198,6 +198,15 @@ struct v4l2_subdev_core_ops {
+@@ -198,6 +198,17 @@ struct v4l2_subdev_core_ops {
  	int (*load_fw)(struct v4l2_subdev *sd);
  	int (*reset)(struct v4l2_subdev *sd, u32 val);
  	int (*s_gpio)(struct v4l2_subdev *sd, u32 val);
++
 +#ifdef CONFIG_VIDEO_ECAM
 +	int (*queryctrl)(struct v4l2_subdev *sd, struct v4l2_queryctrl *qc);
 +	int (*g_ctrl)(struct v4l2_subdev *sd, struct v4l2_control *ctrl);
@@ -913,6 +868,7 @@ index f0cc537ea9ef..cda5cd5ff961 100644
 +	int (*s_ext_ctrls)(struct v4l2_subdev *sd, struct v4l2_ext_controls *ctrls);
 +	int (*try_ext_ctrls)(struct v4l2_subdev *sd, struct v4l2_ext_controls *ctrls);
 +#endif
++	
  	long (*command)(struct v4l2_subdev *sd, unsigned int cmd, void *arg);
  	long (*ioctl)(struct v4l2_subdev *sd, unsigned int cmd, void *arg);
  #ifdef CONFIG_COMPAT

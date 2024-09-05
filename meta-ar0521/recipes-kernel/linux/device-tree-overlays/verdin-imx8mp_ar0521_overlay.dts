@@ -65,6 +65,10 @@
 		status = "okay";
 	};
 
+	m2m_device {
+		status = "okay";
+	};
+
 };
 
 &mipi_csi_0 {
